@@ -2,17 +2,57 @@ const BOARD_SIZE = 20;
 const cellSize = calculateCellSize();
 let board;
 let player;
+let ghosts = [];
+let ghostSpeed = 1000;
 
 document.getElementById('new-game-btn').addEventListener('click', startGame);
+document.addEventListener('keydown', (event)=>{
+    switch(event.key){
+        case 'ArrowUp':
+            player.move(0,-1); //liikutaan ylöspäin
+        break;
+
+        case 'ArrowDown':
+            player.move(0,1);
+        break;
+
+        case 'ArrowLeft':
+            player.move(-1, 0);
+        break;
+
+        case 'ArrowRight':
+            player.move(1,0);
+        break;
+
+        case 'w':
+            shootAt(player.x,player.y -1);
+        break;
+
+        case 's':
+            shootAt(player.x, player.y + 1)
+        break;
+
+        case 'a':
+            shootAt(player.x - 1, player.y)
+        break;
+
+        case 'd':
+            shootAt(player.x +1, player.y )
+        break;
+    }
+    event.preventDefault();
+    })
 
 function startGame(){
     console.log('Klikattu');
     document.getElementById('intro-screen').style.display = 'none';
     document.getElementById('game-screen').style.display = 'block';
-
+    player = new Player(0,0);
     board = generateRandom();
 
     drawBoard(board);
+
+    setInterval(moveGhosts,ghostSpeed);
 }
 
 
@@ -34,6 +74,15 @@ function generateRandom(){
 
     const [playerX, playerY] = randomEmptyPosition(newBoard);
     setCell(newBoard,playerX,playerY, 'P')
+
+    player.x = playerX;
+    player.y = playerY;
+
+    for(let i = 0; i < 5; i++){
+        const [ghostX, ghostY] = randomEmptyPosition(newBoard);
+        setCell(newBoard,ghostX,ghostY,'G');
+        ghosts.push(new Ghost(ghostX,ghostY));
+    }
     
     return newBoard;
 }
@@ -41,6 +90,7 @@ function generateRandom(){
 function drawBoard(board){
     const gameBoard = document.getElementById('game-board');
     gameBoard.style.gridTemplateColumns = `repeat(${BOARD_SIZE},1fr)`;
+    gameBoard.innerHTML = "";
 
     for(let y = 0; y < BOARD_SIZE; y ++){
         for(let x = 0; x < BOARD_SIZE; x++){
@@ -52,8 +102,20 @@ function drawBoard(board){
             
             if(getCell(board,x,y) === 'W'){
                 cell.classList.add('wall');
-            }else if (getCell(board,x,y) === 'P')
+            }
+            else if (getCell(board,x,y) === 'P'){
                 cell.classList.add('player');
+            }
+            else if(getCell(board,x,y) === 'G'){
+                cell.classList.add('ghost');
+            }
+            else if(getCell(board,x,y)=== 'B'){
+                cell.classList.add('bullet');
+                setTimeout(()=>{
+                    setCell(board,x,y,'');
+                },400);
+            }
+            
             gameBoard.appendChild(cell);
         }
     }
@@ -66,6 +128,7 @@ function getCell(board,x,y){
 function calculateCellSize(){
     const screenSize = Math.min(window.innerWidth,window.innerHeight);
     const gameBoardSize = 0.95 * screenSize;
+    return gameBoardSize / BOARD_SIZE;
 }
 
 function generateObastacles(board){
@@ -105,10 +168,121 @@ function randomInt(min,max){
 function randomEmptyPosition(board){
     x = randomInt(1,BOARD_SIZE - 2);
     y = randomInt(1,BOARD_SIZE - 2);
-
-    return [x,y];
+    if(getCell(board,x,y) === ''){
+        return [x,y];
+    }
+    else{
+        return randomEmptyPosition(board);
+    }
 }
 
 function setCell(board,x,y,value){
     board[y][x] = value;
+}
+
+function shootAt(x,y){
+    if(getCell(board,x,y)=== 'W'){
+        return;
+    }
+
+    const ghostIndex = ghosts.findIndex(ghost => ghost.x === x && ghost.y ===y);
+
+    if(ghostIndex !== -1){
+        ghosts.splice(ghostIndex,1);
+    }
+
+    setCell(board,x,y,'B');
+    drawBoard(board);
+
+    if(ghosts.length ===0){
+        alert('Kaikki kummitukset on voitettu, mutta aika hidasta');
+    }
+}
+
+function moveGhosts(){
+    const oldGhost = ghosts.map(ghost =>({x:ghost.x, y:ghost.y}));
+
+    ghosts.forEach(ghost =>{
+        const newPosition = ghost.moveGhostToweardsPlayer(player,board);
+        ghost.x = newPosition.x;
+        ghost.y = newPosition.y;
+
+        setCell(board,ghost.x, ghost.y, 'G');
+
+        oldGhost.forEach(ghost =>{
+            setCell(board,ghost.x,ghost.y,'');
+        });
+
+        ghosts.forEach(ghost =>{
+            setCell(board,ghost.x, ghost.y, 'G');
+        });
+
+        drawBoard(board);
+    });
+}
+
+function endGame(){
+    alert('Game Over!');
+    
+}
+
+class Player{
+    constructor(x,y){
+        this.x = x;
+        this.y = y;
+    }
+    move(deltaX,deltaY){
+                
+        //missä pelaaja on tällä hetkellä
+        const currentX = player.x;
+        const currentY = player.y;
+
+        //Uusi sijainti pelaajalle
+        const newX = currentX + deltaX;
+        const newY = currentY + deltaY;
+
+        if(getCell(board, newX, newY) === ''){
+            //Annetaan pelaajalle uusi sijainti
+            player.x = newX;
+            player.y = newY;
+    
+            //Poistetaan vanha pelaaja pelilaudalta
+            setCell(board,currentX, currentY,'');
+            //Asetetaan pelaaja pelilaudalle
+            setCell(board,newX,newY,'P');
+            //piirretään pelilauta uusiksi
+            drawBoard(board);
+        }
+        
+    }
+}
+
+class Ghost{
+    constructor(x,y){
+        this.x = x;
+        this.y = y;
+    }
+
+
+    moveGhostToweardsPlayer(player,board){
+        let dx = player.x -this.x;
+        let dy = player.y - this.y;
+
+        let moves =[];
+
+        if(Math.abs(dx) > Math.abs(dy)){
+            if(dx > 0) moves.push({x:this.x +1, y:this.y}) //liikutaan oikealle
+            else moves.push({x:this.x -1, y:this.y}); //liikutaan vasemmalle
+            //pystysuuntainen liike
+            if(dy > 0) moves.push({x:this.x, y:this.y + 1}); //liikutaan alaspäin
+            else moves.push({x:this.x, y:this.y -1}); //liikutaan ylöspäin
+        }
+        for(let move of moves){
+            if(getCell(board,move.x, move.y) === '' || getCell(board, move.x, move.y) === 'P'){
+                return move;
+            }
+        }
+
+        return{x:this.x, y:this.y};
+    }
 }
