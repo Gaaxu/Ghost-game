@@ -4,9 +4,16 @@ let board;
 let player;
 let ghosts = [];
 let ghostSpeed = 1000;
+let isGameRunning = false;
+let ghostInterval;
+let score = 0;
+let ghostNumber = 1;
 
 document.getElementById('new-game-btn').addEventListener('click', startGame);
 document.addEventListener('keydown', (event)=>{
+    if(!isGameRunning){
+        return;
+    }
     switch(event.key){
         case 'ArrowUp':
             player.move(0,-1); //liikutaan ylöspäin
@@ -52,7 +59,15 @@ function startGame(){
 
     drawBoard(board);
 
-    setInterval(moveGhosts,ghostSpeed);
+    ghostInterval = setInterval(moveGhosts,ghostSpeed);
+
+    setTimeout(()=>{
+        ghostInterval = setInterval(moveGhosts,ghostSpeed);
+    }, 1000);
+
+    isGameRunning = true;
+    score = 0;
+    updateScoreBoard(0);
 }
 
 
@@ -78,7 +93,8 @@ function generateRandom(){
     player.x = playerX;
     player.y = playerY;
 
-    for(let i = 0; i < 5; i++){
+    ghosts = [];
+    for(let i = 0; i < ghostNumber; i++){
         const [ghostX, ghostY] = randomEmptyPosition(newBoard);
         setCell(newBoard,ghostX,ghostY,'G');
         ghosts.push(new Ghost(ghostX,ghostY));
@@ -189,13 +205,15 @@ function shootAt(x,y){
 
     if(ghostIndex !== -1){
         ghosts.splice(ghostIndex,1);
+        updateScoreBoard
     }
 
     setCell(board,x,y,'B');
     drawBoard(board);
 
     if(ghosts.length ===0){
-        alert('Kaikki kummitukset on voitettu, mutta aika hidasta');
+        //endGame();
+        startNextLevel
     }
 }
 
@@ -217,13 +235,41 @@ function moveGhosts(){
             setCell(board,ghost.x, ghost.y, 'G');
         });
 
+        if(ghost.x === player.x && ghost.y === player.y){
+            endGame();
+            return;
+        }
+
         drawBoard(board);
     });
 }
 
 function endGame(){
+    isGameRunning = false;
     alert('Game Over!');
-    
+    document.getElementById('intro-screen').style.display = 'block';
+    document.getElementById('game-screen').style.display = 'none';
+    clearInterval(ghostInterval);
+}
+
+function updateScoreBoard(points){
+    const scoreBoard = document.getElementById('score-board');
+    score += points;
+    scoreBoard.textContent = `Pisteet: ${score}`;
+}
+
+function startNextLevel(){
+    alert('Level up! Haamujen nopeus kasvaa!');
+    ghostNumber ++;
+    board = generateRandomBoard();
+    drawBoard(board);
+    ghostSpeed *= 0.9;
+
+    ghostInterval = setInterval(moveGhosts,ghostSpeed);
+
+    setTimeout(()=>{
+        ghostInterval = setInterval(moveGhosts,ghostSpeed);
+    }, 1000);
 }
 
 class Player{
